@@ -1,74 +1,167 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  Text, FlatList, RefreshControl, StyleSheet, 
+  View, SafeAreaView, StatusBar, ActivityIndicator, Dimensions 
+} from 'react-native';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
+// TypeScript interfaces
+interface FeedItem {
+  entry_id: number;
+  field1?: string;
+  field2?: string;
+  field3?: string;
+  field4?: string;
+  created_at?: string;
 }
 
+interface ChannelInfo {
+  name?: string;
+  updated_at?: string;
+}
+
+// Get screen width for dynamic scaling
+const { width } = Dimensions.get('window');
+
+const HomeScreen = () => {
+  const [data, setData] = useState<FeedItem[]>([]);
+  const [channelInfo, setChannelInfo] = useState<ChannelInfo>({});
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        'https://api.thingspeak.com/channels/2858135/feeds.json?api_key=SKW4Z74VMRJ9LHVP&results=10'
+      );
+      const result = await response.json();
+      setData(result.feeds || []);
+      setChannelInfo(result.channel || {});
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setRefreshing(false);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchData();
+  }, []);
+
+  const renderItem = ({ item }: { item: FeedItem }) => (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Data Entry (ID: {item.entry_id})</Text>
+      <Text style={styles.cardText}>Shoulder 1: {item.field1 || 'N/A'}</Text>
+      <Text style={styles.cardText}>Shoulder 2: {item.field2 || 'N/A'}</Text>
+      <Text style={styles.cardText}>Upper Back: {item.field3 || 'N/A'}</Text>
+      <Text style={styles.cardText}>Lower Back: {item.field4 || 'N/A'}</Text>
+      <Text style={styles.cardTimestamp}>
+        Created At: {item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}
+      </Text>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar backgroundColor="#0056b3" barStyle="light-content" /> 
+
+      {/* Header */}
+      <View style={styles.titleContainer}>
+        <Text style={styles.titleText}>{channelInfo?.name || 'Health Data Visualization'}</Text>
+        <Text style={styles.updatedText}>
+          Last Updated: {channelInfo?.updated_at ? new Date(channelInfo.updated_at).toLocaleString() : 'N/A'}
+        </Text>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#0056b3" style={styles.loader} />
+      ) : (
+        <FlatList
+          data={data}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.entry_id.toString()}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={styles.listContainer}
+        />
+      )}
+    </SafeAreaView>
+  );
+};
+
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#E8ECF4', 
+  },
   titleContainer: {
-    flexDirection: 'row',
+    backgroundColor: '#0056b3', 
+    width: '100%',
+    paddingVertical: 20,
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  titleText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  updatedText: {
+    fontSize: 14,
+    color: '#E0E0E0',
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  listContainer: {
+    flexGrow: 1,
+    padding: 16,
+    alignItems: 'center',
+  },
+  card: {
+    padding: 20,
+    marginVertical: 10,
+    width: width * 0.9, 
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
+  },
+  cardText: {
+    fontSize: 16,
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#444',
+  },
+  cardTimestamp: {
+    fontSize: 14,
+    color: '#777',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  loader: {
+    marginTop: 50,
   },
 });
+
+export default HomeScreen;
