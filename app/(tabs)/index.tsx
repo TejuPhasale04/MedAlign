@@ -4,7 +4,6 @@ import {
   View, SafeAreaView, StatusBar, ActivityIndicator, Dimensions 
 } from 'react-native';
 
-// TypeScript interfaces
 interface FeedItem {
   entry_id: number;
   field1?: string;
@@ -16,10 +15,8 @@ interface FeedItem {
 
 interface ChannelInfo {
   name?: string;
-  updated_at?: string;
 }
 
-// Get screen width for dynamic scaling
 const { width } = Dimensions.get('window');
 
 const HomeScreen = () => {
@@ -32,10 +29,13 @@ const HomeScreen = () => {
     try {
       setLoading(true);
       const response = await fetch(
-        'https://api.thingspeak.com/channels/2858135/feeds.json?api_key=SKW4Z74VMRJ9LHVP&results=10'
+        'https://api.thingspeak.com/channels/2858135/feeds.json?api_key=SKW4Z74VMRJ9LHVP'
       );
       const result = await response.json();
-      setData(result.feeds || []);
+      const sortedData = (result.feeds || []).sort(
+        (a: FeedItem, b: FeedItem) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime()
+      );
+      setData(sortedData);
       setChannelInfo(result.channel || {});
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -47,6 +47,8 @@ const HomeScreen = () => {
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 20000); 
+    return () => clearInterval(interval);
   }, []);
 
   const onRefresh = useCallback(() => {
@@ -54,13 +56,28 @@ const HomeScreen = () => {
     fetchData();
   }, []);
 
+  const getLastUpdatedTime = () => {
+    if (data.length > 0) {
+      const lastEntryTime = new Date(data[data.length - 1].created_at!);
+      const currentTime = new Date();
+      const timeDiff = (currentTime.getTime() - lastEntryTime.getTime()) / 60000;
+      
+      if (timeDiff < 60) {
+        return `${Math.floor(timeDiff)} min ago`;
+      } else {
+        return lastEntryTime.toLocaleString();
+      }
+    }
+    return 'N/A';
+  };
+
   const renderItem = ({ item }: { item: FeedItem }) => (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Data Entry (ID: {item.entry_id})</Text>
-      <Text style={styles.cardText}>Shoulder 1: {item.field1 || 'N/A'}</Text>
-      <Text style={styles.cardText}>Shoulder 2: {item.field2 || 'N/A'}</Text>
-      <Text style={styles.cardText}>Upper Back: {item.field3 || 'N/A'}</Text>
-      <Text style={styles.cardText}>Lower Back: {item.field4 || 'N/A'}</Text>
+      <Text style={styles.cardText}>Shoulder 1: {item.field1 || '0'}</Text>
+      <Text style={styles.cardText}>Shoulder 2: {item.field2 || '0'}</Text>
+      <Text style={styles.cardText}>Upper Back: {item.field3 || '0'}</Text>
+      <Text style={styles.cardText}>Lower Back: {item.field4 || '0'}</Text>
       <Text style={styles.cardTimestamp}>
         Created At: {item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}
       </Text>
@@ -70,12 +87,10 @@ const HomeScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar backgroundColor="#0056b3" barStyle="light-content" /> 
-
-      {/* Header */}
       <View style={styles.titleContainer}>
-        <Text style={styles.titleText}>{channelInfo?.name || 'Health Data Visualization'}</Text>
+        <Text style={styles.titleText}>{channelInfo?.name || 'Posture Detector'}</Text>
         <Text style={styles.updatedText}>
-          Last Updated: {channelInfo?.updated_at ? new Date(channelInfo.updated_at).toLocaleString() : 'N/A'}
+          Last Updated: {getLastUpdatedTime()}
         </Text>
       </View>
 
@@ -95,73 +110,16 @@ const HomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#E8ECF4', 
-  },
-  titleContainer: {
-    backgroundColor: '#0056b3', 
-    width: '100%',
-    paddingVertical: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  titleText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  updatedText: {
-    fontSize: 14,
-    color: '#E0E0E0',
-    marginTop: 5,
-    textAlign: 'center',
-  },
-  listContainer: {
-    flexGrow: 1,
-    padding: 16,
-    alignItems: 'center',
-  },
-  card: {
-    padding: 20,
-    marginVertical: 10,
-    width: width * 0.9, 
-    backgroundColor: '#FFFFFF',
-    borderRadius: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    alignItems: 'center',
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: '#333',
-  },
-  cardText: {
-    fontSize: 16,
-    marginTop: 8,
-    textAlign: 'center',
-    color: '#444',
-  },
-  cardTimestamp: {
-    fontSize: 14,
-    color: '#777',
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  loader: {
-    marginTop: 50,
-  },
+  safeArea: { flex: 1, backgroundColor: '#E8ECF4' },
+  titleContainer: { backgroundColor: '#0056b3', width: '100%', paddingVertical: 20, alignItems: 'center' },
+  titleText: { fontSize: 24, fontWeight: 'bold', color: '#FFFFFF' },
+  updatedText: { fontSize: 14, color: '#E0E0E0', marginTop: 5 },
+  listContainer: { flexGrow: 1, padding: 16, alignItems: 'center' },
+  card: { padding: 20, marginVertical: 10, width: width * 0.9, backgroundColor: '#FFFFFF', borderRadius: 15, elevation: 3 },
+  cardTitle: { fontSize: 20, fontWeight: 'bold' },
+  cardText: { fontSize: 16, marginTop: 8 },
+  cardTimestamp: { fontSize: 14, color: '#777', marginTop: 12 },
+  loader: { marginTop: 50 },
 });
 
 export default HomeScreen;
